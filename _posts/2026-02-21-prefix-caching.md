@@ -257,3 +257,10 @@ block_size = 16, system prompt = 26 tokens
 vLLM:   只能复用前 16 tokens（1 个满块），剩余 10 tokens 重算  → 复用率 61%
 SGLang: 全部 26 tokens 精确匹配复用                           → 复用率 100%
 ```
+
+# LB 选择
+
+Session sticky 更能充分利用 perfix cacheing，和localcache 类似，避免cluster级别的浪费，需要离散 定向到 特定的实例。 
+
+之前用nignx+ session sticky 解决类似问题，自研可以用 类似 edge router layer 来通过 集中stoage 来做各种路由逻辑，这样策略更灵活，缺点是多一次 lb和 edge-router之间的 prefretch和 failback 协议。 
+
