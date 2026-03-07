@@ -4,7 +4,7 @@ icon: fas fa-info-circle
 order: 4
 ---
 
-> **Contact:**  527550773@qq.com
+> **Contact:**  yunweiguya@163.com
 >
 > 知行合一 !
 {: .prompt-tip }
