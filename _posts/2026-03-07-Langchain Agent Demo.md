@@ -1,12 +1,12 @@
 ---
-title:  Langchain Agent Demo
+title:  Langchain/Mem0/Langgraph Agent Demo
 date: 2026-03-07 21:00:00 +0800
-categories: [Langchain, Agent, Mcp]
-tags: [agent, mcp, langchain]
+categories: [Langchain, Langgraph, Mem0, Agent, Mcp]
+tags: [agent, mcp, mem0, langchain, langgraph]
 pin: true
 ---
 
-# Mcp tool example 
+## Mcp tool example 
 
 ```python
 mcp = FastMCP("mcp001")
@@ -25,7 +25,7 @@ if __name__ == "__main__":
     mcp.run(transport='streamable-http', host='0.0.0.0', port=9000)
 ```
 
-# Agent with rag and tools
+## Agent with rag and tools
 
 ```python
 MCP_URL = "http://127.0.0.1:9000/mcp"
@@ -172,4 +172,36 @@ if __name__ == "__main__":
     asyncio.run(agent001())
 
 ```
+# Langraph Mem0 Fastapi Template
 
+## Langraph
+```
+Graph图：
+如果跑图一半恢复，需要checkpointer,AsyncPostgresSaver是个例子，考虑性能 流量 最好换。 
+self._graph = graph_builder.compile(checkpointer=checkpointer
+```
+## Mem0 长期记忆 
+```
+Mem0长期记忆：
+async def _long_term_memory(self) -> AsyncMemory:
+用 mem0 长期记忆 需要 AsyncMemory，需要提供 vector_store的provider. 
+CREATE TABLE memories (
+    id UUID PRIMARY KEY,
+    vector vector(1536),   -- 嵌入向量，维度由 embedder 决定 text-embedding-3-small 默认 1536
+    payload JSONB          -- 见下
+);
+
+筛出行向量相似度检索。
+跑完图(flow)执行 _update_long_term_memory，后台更新长期记忆。 
+
+clear_chat_history 清除 ["checkpoint_blobs", "checkpoint_writes", "checkpoints"] 3个表中thread_id 内容,仅 checkpoint，不删 mem0。 
+```
+## 大致flow 
+```
+create_session 后 /chat 根据jwt token拿session_id 
+ 接口带 slowapi限流 
+session_id = verify_token(token)
+
+拿记忆，prepare_messages 会压缩， agent跑图，更新 长期记忆。 
+chat_history来自 checkpointer。
+```
