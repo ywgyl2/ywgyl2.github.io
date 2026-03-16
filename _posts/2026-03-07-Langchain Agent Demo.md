@@ -1,10 +1,161 @@
 ---
-title:  Langchain/Mem0/Langgraph Agent Demo
+title:  Langchain/Mem0/ReAct Agent
 date: 2026-03-07 21:00:00 +0800
 categories: [Langchain, Langgraph, Mem0, Agent, Mcp]
 tags: [agent, mcp, mem0, langchain, langgraph]
 pin: true
 ---
+
+
+## Agent ReAct Flow
+
+LLM 永远不直接执行任何 side-effect，所有执行权归 Runtime 状态机。
+
+
+```
+                            User Input
+                                │
+                                ▼
+                         ┌─────────────┐
+                         │ Intent Gate │── chitchat ─▶ 直接回答
+                         └──────┬──────┘── reject  ─▶ 拒绝
+                                │ tool_needed
+                                ▼
+                         ┌─────────────┐
+        ┌───────────────▶│    PLAN     │◀──────── replan ──────┐
+        │                │   (调LLM)   │                       │
+        │                └──────┬──────┘                       │
+        │                       │ proposal                     │
+        │                       ▼                              │
+        │                ┌─────────────┐                       │
+        │                │ DECIDE      │  steps?               │
+        │                └──────┬──────┘                       │
+        │                       │                              │
+        │              ┌────────┴────────┐                     │
+        │              ▼                 ▼                     │
+        │        action="tool"     action="answer"             │
+        │              │                 │                     │
+        │              ▼                 ▼                     │
+        │        ┌──────────┐     ┌──────────────┐            │
+        │        │Validator │     │Answer        │            │
+        │        │exists?   │     │Validator     │            │
+        │        │args?     │     │(防幻觉检查)   │            │
+        │        │          │     └──────┬───────┘            │
+        │        │dup/cost? │       ┌────┴────┐               │
+        │        └────┬─────┘       ▼         ▼               │
+        │             │           PASS    FAIL ─── replan ───▶│
+        │        ┌────┴────┐        │                         │
+        │        ▼         ▼        │                         │
+        │      PASS      FAIL       │                         │
+        │        │    ┌────┴────┐    │                         │
+        │        │    ▼         ▼    │                         │
+        │        │   超限 FINAL      否    │                         │
+        │        │       replan ────┼────────────────────────▶│
+        │        │                 │                         │
+        │        ▼                 ▼                         │
+        │      ┌────────┐   ┌──────────────────┐             │
+        │      │  ACT   │   │  Reflector 终审   │             │
+        │      │(执行tool)│  │ (最终答案质量检查) │             │
+        │      └───┬────┘   └────────┬─────────┘             │
+        │          │            ┌────┴────┐                   │
+        │          ▼            ▼         ▼                   │
+        │      ┌──────────┐   PASS    FAIL ─── replan ───────▶│
+        │      │ OBSERVE  │     │                             
+        │      │(记录结果) │     │                             
+        │      └───┬──────┘     │                             
+        │          │            ▼                              
+        └──────────┘       ┌──────────┐                        
+       (回PLAN,下一步)      │  FINAL   │◀── 步数/预算超限        
+                           │ (生成回答) │   (跳过终审)           
+                           └────┬─────┘                        
+                                │                              
+                                ▼                              
+                           User Answer                         
+                                                               
+```
+
+```
+
+Intent Gate
+  快速短路，没必要走状态机的响应。
+BERT小模型分类器 ~5-15ms  精度高成本低。 
+Fine-tune 一个轻量模型做三分类 `{tool_needed, chitchat, reject}`
+
+Context Builder
+
+
+User Input
+    │
+    ▼
+┌─────────────┐  命中 → 直接返回
+│  规则匹配层  │  (reject / 明确 chitchat)
+└──────┬──────┘
+       │ 未命中
+       ▼
+┌─────────────┐  置信度 > 0.9 → 直接返回
+│  小模型分类   │  (DistilBERT, 比 BERT 快 3x，精度只掉 3% ~10ms)
+└──────┬──────┘
+       │ 置信度 < 0.9（模糊区间）
+       ▼
+┌─────────────┐  兜底判断
+│  LLM 轻判断  │  (GPT-4o-mini)
+└─────────────┘
+
+if intent == "chitchat":
+    return chitchat_llm(user_input)
+# guard_rails
+if intent == "reject": 
+    return "抱歉，无法处理该请求。"
+
+
+Answer Validator
+    Tool Necessity Check（工具必要性
+    Confidence Check（置信度检查）
+    避免幻觉 没有走工具。 
+
+Runtime Validator 五重校验:
+  1. tool_exists?      → 不存在 → PLAN (error feedback)
+  2. args_valid?       → schema不匹配 → PLAN (error feedback)  
+  3. step_limit?       → 超限 → FINAL (force answer)
+  4. duplicate_call?   → 重复 → PLAN (skip + warn)
+  5. cost_budget?      → 超预算 → FINAL (force answer)
+
+Decide层做厚：
+    `allowed = system ∩ tenant ∩ session`
+    审计与合规（Audit Trail）save
+    Guardrails
+    FAIL  → 不执行，构造 error_feedback， PLAN，避免plan 问题
+
+Executor
+    parallel execution
+
+Memory Layer
+
+其它优化： 
+
+Step Reflector 加一层更细的check 
+ tool_result
+     │
+     ▼
+reflector
+     │
+     ├─ accept
+     └─ replan
+
+Speculative Planning:
+    LLM 一次 plan: [step1 查航班, step2 查日历, step3 创建事件]
+    execute search_flight  │  execute get_calendar
+        execute create_event
+本质是 多步并行。 
+
+Knowledge Graph
+    实体、关系、事实的结构化表示
+
+再加一层 Multi-Agent Orchestrator
+     coordinate agent collaboration。
+
+
+```
 
 ## Mcp tool example 
 
