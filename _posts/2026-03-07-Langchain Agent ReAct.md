@@ -1,15 +1,18 @@
 ---
 title:  Langchain/Mem0/ReAct Agent
 date: 2026-03-07 21:00:00 +0800
-categories: [Langchain, Langgraph, Mem0, Agent, Mcp, ReAct]
-tags: [agent, mcp, mem0, langchain, langgraph]
+categories: [Langchain, Langgraph, Mem0, Agent, Mcp, ReAct, OpenClaw]
+tags: [agent, mcp, mem0, langchain, langgraph, openclaw]
 pin: true
 ---
 
 
 ## Agent ReAct Flow
 
-LLM 永远不直接执行任何 side-effect，所有执行权归 Runtime 状态机。
+
+看了 Nanobot, OpenClaw, Nanoclaw， 其中Nanobot OpenCraw更接近标准的ReAct loop, OpenCraw 每步依赖pi-agent-core的loop, Nanoclaw依赖 claude-agent-sdk的loop。
+
+行业基于状态机的方式，更可控，LLM 永远不直接执行任何 side-effect，所有执行权归 Runtime 状态机。
 
 
 ```
@@ -178,6 +181,7 @@ Knowledge Graph
 │  │                
 │  └──────────────────────────────────────────────────────┘     │
 └────────────────────────────────────────────────────────────────┘
+
 
 
 intent增强：Complexity Classifier，决定用不同的model.
