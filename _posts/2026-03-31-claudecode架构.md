@@ -7,7 +7,7 @@ pin: true
 ---
 
 ## Backgroud 
-   Claude Code部分公开，好奇心初步理解了Claude Code和开源Codex的 MultiAgent这块的设计, 思考AgentOS的要素。
+   Claude Code突发部分公开，好奇心驱动初步了解了下Claude Code和开源Codex的 MultiAgent这块的设计。
  
 
 ## Claude Code
